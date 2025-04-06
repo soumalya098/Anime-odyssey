@@ -62,7 +62,7 @@ const BlogDetail = () => {
     return "Invalid date";
   };
 
-  // Function to render content with embedded images
+  // Improved function to render content with embedded images
   const renderContent = (content: string) => {
     if (!content) return null;
     
@@ -71,7 +71,7 @@ const BlogDetail = () => {
     
     // Split the content by image markdown
     const parts = content.split(imgRegex);
-    const matches = content.match(imgRegex) || [];
+    const matches = [...content.matchAll(imgRegex)];
     
     // If no images found, just return the content as is
     if (matches.length === 0) {
@@ -80,34 +80,51 @@ const BlogDetail = () => {
     
     // Build the rendered content with images
     const result = [];
-    let matchIndex = 0;
+    let textIndex = 0;
     
-    for (let i = 0; i < parts.length; i++) {
-      // Add text part
-      if (parts[i]) {
-        result.push(
-          <p key={`text-${i}`} className="whitespace-pre-line">
-            {parts[i]}
-          </p>
-        );
-      }
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i];
+      const matchIndex = match.index as number;
       
-      // Add image if we have a match
-      if (matches[matchIndex]) {
-        // Extract URL from ![alt](url)
-        const imgMatch = /!\[([^\]]*)\]\(([^)]+)\)/.exec(matches[matchIndex]);
-        if (imgMatch && imgMatch[2]) {
+      // Add text before the image if there is any
+      if (matchIndex > textIndex) {
+        const textBeforeImage = content.substring(textIndex, matchIndex);
+        if (textBeforeImage) {
           result.push(
-            <div key={`img-${i}`} className="my-6">
-              <img 
-                src={imgMatch[2]} 
-                alt={imgMatch[1] || "Blog image"}
-                className="rounded-lg mx-auto max-h-[500px] object-contain"
-              />
-            </div>
+            <p key={`text-${i}`} className="whitespace-pre-line">
+              {textBeforeImage}
+            </p>
           );
         }
-        matchIndex++;
+      }
+      
+      // Add the image
+      const imgUrl = match[2];
+      const altText = match[1] || "Blog image";
+      
+      result.push(
+        <div key={`img-${i}`} className="my-6">
+          <img 
+            src={imgUrl} 
+            alt={altText}
+            className="rounded-lg mx-auto max-h-[500px] object-contain"
+          />
+        </div>
+      );
+      
+      // Update the text index to after this image markdown
+      textIndex = matchIndex + match[0].length;
+    }
+    
+    // Add any remaining text after the last image
+    if (textIndex < content.length) {
+      const textAfterImages = content.substring(textIndex);
+      if (textAfterImages) {
+        result.push(
+          <p key="text-final" className="whitespace-pre-line">
+            {textAfterImages}
+          </p>
+        );
       }
     }
     
@@ -169,7 +186,11 @@ const BlogDetail = () => {
           {blog.tags && blog.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-8">
               {blog.tags.map((tag, index) => (
-                <span key={index} className="bg-secondary/50 px-3 py-1 rounded-full text-sm">
+                <span key={index} className={`px-3 py-1 rounded-full text-sm ${
+                  tag === 'featured' ? 'bg-green-500/30 text-green-200' : 
+                  tag === 'latest' ? 'bg-blue-500/30 text-blue-200' : 
+                  'bg-secondary/50'
+                }`}>
                   {tag}
                 </span>
               ))}

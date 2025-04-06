@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Edit, Image } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface Blog {
   id: string;
@@ -41,6 +42,8 @@ const AdminPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredBlogs, setFilteredBlogs] = useState<Blog[]>([]);
   const [currentTab, setCurrentTab] = useState("create");
+  const [isFeatured, setIsFeatured] = useState(false);
+  const [isLatest, setIsLatest] = useState(false);
 
   // Load blogs for management
   useEffect(() => {
@@ -101,6 +104,11 @@ const AdminPage = () => {
         setImageUrl(blogData.imageUrl || "");
         setAuthor(blogData.author || "Admin");
         setTags(blogData.tags || []);
+        
+        // Set category checkboxes based on tags
+        setIsFeatured(blogData.tags?.includes("featured") || false);
+        setIsLatest(blogData.tags?.includes("latest") || false);
+        
         setIsEditing(true);
         toast.info("Blog loaded for editing");
       } else {
@@ -127,9 +135,11 @@ const AdminPage = () => {
     const imageUrl = prompt("Enter image URL:");
     if (!imageUrl) return;
     
-    const imageMarkup = `\n![Image](${imageUrl})\n`;
+    // Create a proper markdown image that will be parsed correctly
+    const imageMarkdown = `\n![Image](${imageUrl})\n`;
+    
     setContent(prevContent => {
-      return prevContent + imageMarkup;
+      return prevContent + imageMarkdown;
     });
   };
 
@@ -140,6 +150,8 @@ const AdminPage = () => {
     setImageUrl("");
     setAuthor("Admin");
     setTags([]);
+    setIsFeatured(false);
+    setIsLatest(false);
     setIsEditing(false);
     setSearchParams({});
   };
@@ -149,13 +161,29 @@ const AdminPage = () => {
     setIsSubmitting(true);
 
     try {
+      // Create a copy of tags array
+      let updatedTags = [...tags];
+      
+      // Manage special category tags
+      if (isFeatured && !updatedTags.includes("featured")) {
+        updatedTags.push("featured");
+      } else if (!isFeatured && updatedTags.includes("featured")) {
+        updatedTags = updatedTags.filter(tag => tag !== "featured");
+      }
+      
+      if (isLatest && !updatedTags.includes("latest")) {
+        updatedTags.push("latest");
+      } else if (!isLatest && updatedTags.includes("latest")) {
+        updatedTags = updatedTags.filter(tag => tag !== "latest");
+      }
+
       const blogData = {
         title,
         description,
         content,
         imageUrl,
         author,
-        tags,
+        tags: updatedTags,
         date: isEditing ? serverTimestamp() : serverTimestamp(),
         likes: []
       };
@@ -179,6 +207,11 @@ const AdminPage = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Helper to check if a tag is a "category" tag we manage separately
+  const isSpecialCategoryTag = (tag: string) => {
+    return tag === "featured" || tag === "latest";
   };
 
   if (!isAdmin) {
@@ -234,10 +267,36 @@ const AdminPage = () => {
               />
             </div>
             
+            <div className="space-y-3">
+              <Label>Blog Categories</Label>
+              <div className="flex flex-col space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="isFeatured"
+                    checked={isFeatured}
+                    onCheckedChange={(checked) => setIsFeatured(checked as boolean)}
+                  />
+                  <Label htmlFor="isFeatured" className="font-normal cursor-pointer">
+                    Featured Blog (show in Featured section)
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="isLatest"
+                    checked={isLatest}
+                    onCheckedChange={(checked) => setIsLatest(checked as boolean)}
+                  />
+                  <Label htmlFor="isLatest" className="font-normal cursor-pointer">
+                    Latest Blog (show in Latest section)
+                  </Label>
+                </div>
+              </div>
+            </div>
+            
             <div className="space-y-2">
               <Label>Tags</Label>
               <div className="flex flex-wrap gap-2 mb-2">
-                {tags.map((tag, index) => (
+                {tags.filter(tag => !isSpecialCategoryTag(tag)).map((tag, index) => (
                   <div key={index} className="bg-secondary px-3 py-1 rounded-full flex items-center gap-2">
                     <span>{tag}</span>
                     <button 
@@ -254,7 +313,7 @@ const AdminPage = () => {
                 <Input
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
-                  placeholder="Add a tag (e.g., featured, latest, action, romance)"
+                  placeholder="Add a tag (e.g., action, romance, shonen)"
                 />
                 <Button 
                   type="button" 
@@ -295,7 +354,7 @@ const AdminPage = () => {
                 id="content"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="Write your blog content here. Use ![Image](URL) to embed images."
+                placeholder="Write your blog content here. Use the Insert Image button to add images between paragraphs."
                 required
                 className="min-h-[300px] font-mono"
               />
@@ -347,7 +406,11 @@ const AdminPage = () => {
                     <h3 className="font-bold">{blog.title}</h3>
                     <div className="text-sm text-muted-foreground flex flex-wrap gap-2 mt-1">
                       {blog.tags.map((tag, index) => (
-                        <span key={index} className="bg-secondary/50 px-2 py-0.5 rounded-full text-xs">
+                        <span key={index} className={`px-2 py-0.5 rounded-full text-xs ${
+                          tag === 'featured' ? 'bg-green-500/30 text-green-200' : 
+                          tag === 'latest' ? 'bg-blue-500/30 text-blue-200' : 
+                          'bg-secondary/50'
+                        }`}>
                           {tag}
                         </span>
                       ))}
