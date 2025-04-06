@@ -4,7 +4,7 @@ import { HeroSection } from "../components/HeroSection";
 import { FeaturedBlogCard } from "../components/FeaturedBlogCard";
 import { BlogCard } from "../components/BlogCard";
 import { Link } from "react-router-dom";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface Blog {
@@ -15,6 +15,7 @@ interface Blog {
   content: string;
   date: any;
   author: string;
+  tags: string[];
 }
 
 const HomePage = () => {
@@ -27,24 +28,64 @@ const HomePage = () => {
       try {
         const blogsRef = collection(db, "blogs");
         
-        // Get featured blogs (first 3)
-        const featuredQuery = query(blogsRef, orderBy("date", "desc"), limit(3));
+        // Get featured blogs based on "featured" tag
+        const featuredQuery = query(
+          blogsRef,
+          where("tags", "array-contains", "featured"),
+          orderBy("date", "desc"),
+          limit(3)
+        );
+        
         const featuredSnapshot = await getDocs(featuredQuery);
-        const featuredData = featuredSnapshot.docs.map(doc => ({
+        let featuredData = featuredSnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
+          tags: doc.data().tags || []
         })) as Blog[];
         
-        // Get recent blogs (next 4)
-        const recentQuery = query(blogsRef, orderBy("date", "desc"), limit(7));
+        // If no featured blogs, fallback to most recent blogs
+        if (featuredData.length === 0) {
+          const fallbackQuery = query(blogsRef, orderBy("date", "desc"), limit(3));
+          const fallbackSnapshot = await getDocs(fallbackQuery);
+          featuredData = fallbackSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            tags: doc.data().tags || []
+          })) as Blog[];
+        }
+        
+        // Get blogs with "latest" tag or fallback to most recent 
+        const recentQuery = query(
+          blogsRef,
+          where("tags", "array-contains", "latest"),
+          orderBy("date", "desc"),
+          limit(4)
+        );
         const recentSnapshot = await getDocs(recentQuery);
-        const allBlogs = recentSnapshot.docs.map(doc => ({
+        let recentData = recentSnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
+          tags: doc.data().tags || []
         })) as Blog[];
         
-        // Exclude the first 3 (featured) blogs from recent blogs
-        const recentData = allBlogs.slice(3, 7);
+        // Fallback to most recent that aren't in featured
+        if (recentData.length < 4) {
+          const fallbackRecentQuery = query(blogsRef, orderBy("date", "desc"), limit(10));
+          const fallbackRecentSnapshot = await getDocs(fallbackRecentQuery);
+          const allRecentBlogs = fallbackRecentSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            tags: doc.data().tags || []
+          })) as Blog[];
+          
+          // Filter out blogs that are already in featured section
+          const featuredIds = featuredData.map(blog => blog.id);
+          const additionalRecent = allRecentBlogs
+            .filter(blog => !featuredIds.includes(blog.id) && !recentData.some(rb => rb.id === blog.id))
+            .slice(0, 4 - recentData.length);
+          
+          recentData = [...recentData, ...additionalRecent];
+        }
         
         setFeaturedBlogs(featuredData);
         setRecentBlogs(recentData);

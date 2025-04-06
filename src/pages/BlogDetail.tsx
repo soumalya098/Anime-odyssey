@@ -12,6 +12,7 @@ interface Blog {
   content: string;
   date: any;
   author: string;
+  tags: string[];
 }
 
 const BlogDetail = () => {
@@ -31,7 +32,8 @@ const BlogDetail = () => {
         if (blogSnap.exists()) {
           setBlog({
             id: blogSnap.id,
-            ...blogSnap.data()
+            ...blogSnap.data(),
+            tags: blogSnap.data().tags || []
           } as Blog);
         } else {
           setError("Blog not found");
@@ -58,6 +60,58 @@ const BlogDetail = () => {
       }).format(d);
     }
     return "Invalid date";
+  };
+
+  // Function to render content with embedded images
+  const renderContent = (content: string) => {
+    if (!content) return null;
+    
+    // Regular expression to find image markdown ![alt](url)
+    const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    
+    // Split the content by image markdown
+    const parts = content.split(imgRegex);
+    const matches = content.match(imgRegex) || [];
+    
+    // If no images found, just return the content as is
+    if (matches.length === 0) {
+      return <p className="whitespace-pre-line">{content}</p>;
+    }
+    
+    // Build the rendered content with images
+    const result = [];
+    let matchIndex = 0;
+    
+    for (let i = 0; i < parts.length; i++) {
+      // Add text part
+      if (parts[i]) {
+        result.push(
+          <p key={`text-${i}`} className="whitespace-pre-line">
+            {parts[i]}
+          </p>
+        );
+      }
+      
+      // Add image if we have a match
+      if (matches[matchIndex]) {
+        // Extract URL from ![alt](url)
+        const imgMatch = /!\[([^\]]*)\]\(([^)]+)\)/.exec(matches[matchIndex]);
+        if (imgMatch && imgMatch[2]) {
+          result.push(
+            <div key={`img-${i}`} className="my-6">
+              <img 
+                src={imgMatch[2]} 
+                alt={imgMatch[1] || "Blog image"}
+                className="rounded-lg mx-auto max-h-[500px] object-contain"
+              />
+            </div>
+          );
+        }
+        matchIndex++;
+      }
+    }
+    
+    return result;
   };
 
   if (loading) {
@@ -106,11 +160,21 @@ const BlogDetail = () => {
             {blog.title}
           </h1>
           
-          <div className="flex items-center text-muted-foreground mb-8">
+          <div className="flex items-center text-muted-foreground mb-4">
             <span>By {blog.author}</span>
             <span className="mx-2">•</span>
             <span>{formatDate(blog.date)}</span>
           </div>
+          
+          {blog.tags && blog.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-8">
+              {blog.tags.map((tag, index) => (
+                <span key={index} className="bg-secondary/50 px-3 py-1 rounded-full text-sm">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
           
           <div className="relative aspect-video mb-8 overflow-hidden rounded-lg">
             <img 
@@ -120,8 +184,8 @@ const BlogDetail = () => {
             />
           </div>
           
-          <div className="leading-relaxed whitespace-pre-line">
-            {blog.content}
+          <div className="leading-relaxed">
+            {renderContent(blog.content)}
           </div>
         </article>
       </div>
