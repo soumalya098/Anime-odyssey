@@ -174,16 +174,16 @@ const BlogDetail = () => {
         
         <article className="prose prose-lg dark:prose-invert max-w-none">
           <h1 className="text-4xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-anime-pink via-anime-purple to-anime-blue">
-            {blog.title}
+            {blog?.title}
           </h1>
           
           <div className="flex items-center text-muted-foreground mb-4">
-            <span>By {blog.author}</span>
+            <span>By {blog?.author}</span>
             <span className="mx-2">•</span>
-            <span>{formatDate(blog.date)}</span>
+            <span>{blog?.date ? formatDate(blog.date) : ""}</span>
           </div>
           
-          {blog.tags && blog.tags.length > 0 && (
+          {blog?.tags && blog.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-8">
               {blog.tags.map((tag, index) => (
                 <span key={index} className={`px-3 py-1 rounded-full text-sm ${
@@ -199,14 +199,14 @@ const BlogDetail = () => {
           
           <div className="relative aspect-video mb-8 overflow-hidden rounded-lg">
             <img 
-              src={blog.imageUrl || "/placeholder.svg"} 
-              alt={blog.title}
+              src={blog?.imageUrl || "/placeholder.svg"} 
+              alt={blog?.title}
               className="w-full h-full object-cover"
             />
           </div>
           
           <div className="leading-relaxed">
-            {renderContent(blog.content)}
+            {blog?.content ? renderContent(blog.content) : null}
           </div>
         </article>
       </div>

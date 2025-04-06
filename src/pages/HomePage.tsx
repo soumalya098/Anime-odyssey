@@ -28,7 +28,7 @@ const HomePage = () => {
       try {
         const blogsRef = collection(db, "blogs");
         
-        // Get featured blogs based on "featured" tag
+        // Get featured blogs
         const featuredQuery = query(
           blogsRef,
           where("tags", "array-contains", "featured"),
@@ -54,22 +54,23 @@ const HomePage = () => {
           })) as Blog[];
         }
         
-        // Get blogs with "latest" tag or fallback to most recent 
-        const recentQuery = query(
+        // Get latest blogs
+        const latestQuery = query(
           blogsRef,
           where("tags", "array-contains", "latest"),
           orderBy("date", "desc"),
           limit(4)
         );
-        const recentSnapshot = await getDocs(recentQuery);
-        let recentData = recentSnapshot.docs.map(doc => ({
+        
+        const latestSnapshot = await getDocs(latestQuery);
+        let latestData = latestSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
           tags: doc.data().tags || []
         })) as Blog[];
         
         // Fallback to most recent that aren't in featured
-        if (recentData.length < 4) {
+        if (latestData.length < 4) {
           const fallbackRecentQuery = query(blogsRef, orderBy("date", "desc"), limit(10));
           const fallbackRecentSnapshot = await getDocs(fallbackRecentQuery);
           const allRecentBlogs = fallbackRecentSnapshot.docs.map(doc => ({
@@ -81,14 +82,17 @@ const HomePage = () => {
           // Filter out blogs that are already in featured section
           const featuredIds = featuredData.map(blog => blog.id);
           const additionalRecent = allRecentBlogs
-            .filter(blog => !featuredIds.includes(blog.id) && !recentData.some(rb => rb.id === blog.id))
-            .slice(0, 4 - recentData.length);
+            .filter(blog => !featuredIds.includes(blog.id) && !latestData.some(rb => rb.id === blog.id))
+            .slice(0, 4 - latestData.length);
           
-          recentData = [...recentData, ...additionalRecent];
+          latestData = [...latestData, ...additionalRecent];
         }
         
+        console.log("Featured blogs:", featuredData);
+        console.log("Latest blogs:", latestData);
+        
         setFeaturedBlogs(featuredData);
-        setRecentBlogs(recentData);
+        setRecentBlogs(latestData);
       } catch (error) {
         console.error("Error fetching blogs:", error);
       } finally {
