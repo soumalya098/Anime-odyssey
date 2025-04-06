@@ -3,10 +3,13 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeToggle } from "./ThemeToggle";
 import { Menu, X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { AuthDialog } from "./AuthDialog";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
+  const { currentUser, isAdmin } = useAuth();
   
   const isActive = (path: string) => location.pathname === path;
   
@@ -16,6 +19,11 @@ export const Navbar = () => {
     { name: "About", path: "/about" },
     { name: "Contact", path: "/contact" },
   ];
+
+  // Add admin link if user is admin
+  if (isAdmin) {
+    navLinks.push({ name: "Admin", path: "/admin" });
+  }
 
   return (
     <header className="sticky top-0 z-50 w-full glassmorphism">
@@ -39,11 +47,15 @@ export const Navbar = () => {
               {link.name}
             </Link>
           ))}
-          <ThemeToggle />
+          <div className="flex items-center gap-4">
+            <AuthDialog />
+            <ThemeToggle />
+          </div>
         </nav>
 
         {/* Mobile Navigation Toggle */}
         <div className="flex items-center gap-4 md:hidden">
+          <AuthDialog />
           <ThemeToggle />
           <button
             className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground transition-colors hover:bg-secondary/80"

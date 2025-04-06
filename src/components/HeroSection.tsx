@@ -1,7 +1,11 @@
 
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { AuthDialog } from "./AuthDialog";
 
 export const HeroSection = () => {
+  const { currentUser } = useAuth();
+
   return (
     <div className="relative min-h-[70vh] flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 bg-hero-pattern bg-cover bg-center"></div>
@@ -18,9 +22,14 @@ export const HeroSection = () => {
           <Link to="/blogs" className="anime-button">
             <span className="relative z-10">Explore Blogs</span>
           </Link>
-          <Link to="/about" className="anime-button-outline">
-            <span className="relative z-10">About Us</span>
-          </Link>
+          
+          {!currentUser ? (
+            <AuthDialog />
+          ) : (
+            <Link to="/about" className="anime-button-outline">
+              <span className="relative z-10">About Us</span>
+            </Link>
+          )}
         </div>
       </div>
     </div>

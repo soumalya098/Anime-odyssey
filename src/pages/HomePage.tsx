@@ -1,69 +1,76 @@
 
+import { useEffect, useState } from "react";
 import { HeroSection } from "../components/HeroSection";
 import { FeaturedBlogCard } from "../components/FeaturedBlogCard";
 import { BlogCard } from "../components/BlogCard";
 import { Link } from "react-router-dom";
+import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
-const featuredBlogs = [
-  {
-    id: "1",
-    title: "The Beauty of Anime Landscapes",
-    description: "Exploring the artistic brilliance behind anime's most stunning natural scenery",
-    imageUrl: "/lovable-uploads/8a58d71c-a9ad-45da-8e75-a4c73b036533.png",
-    author: "Miyuki Tanaka"
-  },
-  {
-    id: "2",
-    title: "Character Design Philosophy",
-    description: "Understanding what makes anime characters so memorable and impactful",
-    imageUrl: "/lovable-uploads/09815684-8765-4beb-8048-734dc1fca570.png",
-    author: "Haruto Sato"
-  },
-  {
-    id: "3",
-    title: "Emotions Through Animation",
-    description: "How anime conveys complex emotions through simple yet powerful techniques",
-    imageUrl: "/lovable-uploads/82ada9d2-2b20-4ea9-b7a3-3f1f7413f221.png",
-    author: "Aiko Yamamoto"
-  }
-];
-
-const recentBlogs = [
-  {
-    id: "4",
-    title: "Seasonal Anime: Winter 2025 Preview",
-    description: "A comprehensive look at the most anticipated anime releasing in the winter season. From sequels to exciting new IPs, this winter is packed with content for every anime fan.",
-    imageUrl: "/lovable-uploads/8b31bbea-16cf-4f18-b8aa-deb5b879c981.png",
-    date: "April 1, 2025",
-    author: "Kazuki Nakamura"
-  },
-  {
-    id: "5",
-    title: "The Evolution of Shonen Protagonists",
-    description: "Tracking how shonen protagonists have changed over the decades, from Dragon Ball's Goku to modern interpretations. Is the traditional shonen hero still relevant in today's anime landscape?",
-    imageUrl: "/lovable-uploads/40b32c5b-f3a1-4bbc-9151-abf0117c6d24.png",
-    date: "March 27, 2025",
-    author: "Yuki Tanaka"
-  },
-  {
-    id: "6",
-    title: "Anime Music: Beyond the Opening Theme",
-    description: "A deep dive into the important role that soundtrack and background music play in creating atmosphere and emotional impact in anime series.",
-    imageUrl: "/lovable-uploads/50fa3c92-e6c0-4ca2-bd5b-24d86ea04299.png",
-    date: "March 20, 2025",
-    author: "Hana Watanabe"
-  },
-  {
-    id: "7",
-    title: "Studio Spotlight: MAPPA's Rise to Fame",
-    description: "How MAPPA went from a small studio to one of the industry's giants, analyzing their production style and what makes their adaptations so successful.",
-    imageUrl: "/lovable-uploads/5c2336a0-649b-4dd4-8297-2f7291555417.png",
-    date: "March 15, 2025",
-    author: "Ren Suzuki"
-  }
-];
+interface Blog {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  content: string;
+  date: any;
+  author: string;
+}
 
 const HomePage = () => {
+  const [featuredBlogs, setFeaturedBlogs] = useState<Blog[]>([]);
+  const [recentBlogs, setRecentBlogs] = useState<Blog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchBlogs = async () => {
+      try {
+        const blogsRef = collection(db, "blogs");
+        
+        // Get featured blogs (first 3)
+        const featuredQuery = query(blogsRef, orderBy("date", "desc"), limit(3));
+        const featuredSnapshot = await getDocs(featuredQuery);
+        const featuredData = featuredSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Blog[];
+        
+        // Get recent blogs (next 4)
+        const recentQuery = query(blogsRef, orderBy("date", "desc"), limit(7));
+        const recentSnapshot = await getDocs(recentQuery);
+        const allBlogs = recentSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Blog[];
+        
+        // Exclude the first 3 (featured) blogs from recent blogs
+        const recentData = allBlogs.slice(3, 7);
+        
+        setFeaturedBlogs(featuredData);
+        setRecentBlogs(recentData);
+      } catch (error) {
+        console.error("Error fetching blogs:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBlogs();
+  }, []);
+
+  const formatDate = (date: any) => {
+    if (!date) return "No date";
+    if (date.toDate) {
+      const d = date.toDate();
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }).format(d);
+    }
+    return "Invalid date";
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <HeroSection />
@@ -76,11 +83,31 @@ const HomePage = () => {
           </p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {featuredBlogs.map((blog) => (
-            <FeaturedBlogCard key={blog.id} {...blog} />
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <p>Loading featured blogs...</p>
+          </div>
+        ) : featuredBlogs.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {featuredBlogs.map((blog) => (
+              <FeaturedBlogCard 
+                key={blog.id}
+                id={blog.id}
+                title={blog.title}
+                description={blog.description}
+                imageUrl={blog.imageUrl || "/placeholder.svg"}
+                author={blog.author}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground mb-4">No featured blogs available yet.</p>
+            <Link to="/admin" className="text-primary hover:underline">
+              Create your first blog post!
+            </Link>
+          </div>
+        )}
       </section>
       
       <section className="bg-secondary/30 py-16">
@@ -106,11 +133,29 @@ const HomePage = () => {
             </Link>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
-            {recentBlogs.map((blog) => (
-              <BlogCard key={blog.id} {...blog} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <p>Loading recent blogs...</p>
+            </div>
+          ) : recentBlogs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
+              {recentBlogs.map((blog) => (
+                <BlogCard 
+                  key={blog.id}
+                  id={blog.id}
+                  title={blog.title}
+                  description={blog.description}
+                  imageUrl={blog.imageUrl || "/placeholder.svg"}
+                  date={formatDate(blog.date)}
+                  author={blog.author}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No recent blogs available yet.</p>
+            </div>
+          )}
         </div>
       </section>
       
