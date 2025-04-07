@@ -31,6 +31,12 @@ const BlogsPage = () => {
         const blogsQuery = query(blogsRef, orderBy("date", "desc"));
         const snapshot = await getDocs(blogsQuery);
         
+        if (snapshot.empty) {
+          console.log("No blogs found in the database");
+          setLoading(false);
+          return;
+        }
+        
         const blogsData = snapshot.docs.map(doc => {
           const data = doc.data();
           return {
@@ -45,6 +51,7 @@ const BlogsPage = () => {
           } as Blog;
         });
         
+        console.log("Blogs fetched for BlogsPage:", blogsData.length);
         setBlogs(blogsData);
         setFilteredBlogs(blogsData);
       } catch (error) {

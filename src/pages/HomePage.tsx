@@ -30,71 +30,63 @@ const HomePage = () => {
       try {
         const blogsRef = collection(db, "blogs");
         
-        // Get featured blogs - blogs that have 'featured' in their tags array
-        const featuredQuery = query(
-          blogsRef,
-          where("tags", "array-contains", "featured"),
-          orderBy("date", "desc"),
-          limit(3)
-        );
+        // First, get all blogs ordered by date
+        const allBlogsQuery = query(blogsRef, orderBy("date", "desc"));
+        const allBlogsSnapshot = await getDocs(allBlogsQuery);
         
-        const featuredSnapshot = await getDocs(featuredQuery);
-        const featuredData: Blog[] = featuredSnapshot.docs.map(doc => {
-          const data = doc.data() as DocumentData;
-          return {
-            id: doc.id,
-            title: data.title || "",
-            description: data.description || "",
-            imageUrl: data.imageUrl || "",
-            content: data.content || "",
-            date: data.date,
-            author: data.author || "",
-            tags: Array.isArray(data.tags) ? data.tags : [],
-            likes: Array.isArray(data.likes) ? data.likes : []
-          };
-        });
-        
-        console.log("Featured blogs fetched:", featuredData.length);
-        
-        // Get latest blogs - using another query for 'latest' tagged blogs
-        const latestQuery = query(
-          blogsRef,
-          where("tags", "array-contains", "latest"),
-          orderBy("date", "desc"),
-          limit(4)
-        );
-        
-        const latestSnapshot = await getDocs(latestQuery);
-        const latestData: Blog[] = latestSnapshot.docs.map(doc => {
-          const data = doc.data() as DocumentData;
-          return {
-            id: doc.id,
-            title: data.title || "",
-            description: data.description || "",
-            imageUrl: data.imageUrl || "",
-            content: data.content || "",
-            date: data.date,
-            author: data.author || "",
-            tags: Array.isArray(data.tags) ? data.tags : [],
-            likes: Array.isArray(data.likes) ? data.likes : []
-          };
-        });
-        
-        console.log("Latest blogs fetched:", latestData.length);
+        if (allBlogsSnapshot.empty) {
+          console.log("No blogs found in the database");
+          setLoading(false);
+          return;
+        }
 
-        // If no featured blogs, use most recent blogs instead
-        const finalFeatured = featuredData.length > 0 
-          ? featuredData 
-          : await fetchRecentBlogs(blogsRef, 3, []);
+        // Process all blogs
+        const allBlogs = allBlogsSnapshot.docs.map(doc => {
+          const data = doc.data() as DocumentData;
+          return {
+            id: doc.id,
+            title: data.title || "",
+            description: data.description || "",
+            imageUrl: data.imageUrl || "",
+            content: data.content || "",
+            date: data.date,
+            author: data.author || "",
+            tags: Array.isArray(data.tags) ? data.tags : [],
+            likes: Array.isArray(data.likes) ? data.likes : []
+          } as Blog;
+        });
         
-        // If not enough latest blogs, fetch more recent ones excluding featured ones
-        const finalLatest = latestData.length >= 4 
-          ? latestData 
-          : await fetchRecentBlogs(
-              blogsRef, 
-              4, 
-              finalFeatured.map(blog => blog.id)
-            );
+        console.log("Total blogs fetched:", allBlogs.length);
+        
+        // Filter for featured blogs
+        const featured = allBlogs.filter(blog => blog.tags.includes("featured"));
+        console.log("Featured blogs after filtering:", featured.length);
+        
+        // Filter for latest blogs
+        const latest = allBlogs.filter(blog => blog.tags.includes("latest"));
+        console.log("Latest blogs after filtering:", latest.length);
+        
+        // If no featured blogs, use most recent blogs instead
+        const finalFeatured = featured.length > 0 
+          ? featured.slice(0, 3) 
+          : allBlogs.slice(0, 3);
+        
+        // If not enough latest blogs, use more recent ones excluding featured ones
+        let finalLatest = latest.length > 0 
+          ? latest.slice(0, 4) 
+          : allBlogs.filter(blog => !finalFeatured.some(fb => fb.id === blog.id)).slice(0, 4);
+        
+        // Ensure we're not showing the same blogs in both sections
+        if (finalLatest.length < 4) {
+          const additionalBlogs = allBlogs
+            .filter(blog => 
+              !finalFeatured.some(fb => fb.id === blog.id) && 
+              !finalLatest.some(lb => lb.id === blog.id)
+            )
+            .slice(0, 4 - finalLatest.length);
+          
+          finalLatest = [...finalLatest, ...additionalBlogs];
+        }
         
         setFeaturedBlogs(finalFeatured);
         setRecentBlogs(finalLatest);
@@ -102,38 +94,6 @@ const HomePage = () => {
         console.error("Error fetching blogs:", error);
       } finally {
         setLoading(false);
-      }
-    };
-
-    // Helper function to fetch recent blogs excluding certain IDs
-    const fetchRecentBlogs = async (blogsRef: any, count: number, excludeIds: string[]): Promise<Blog[]> => {
-      try {
-        const recentQuery = query(blogsRef, orderBy("date", "desc"), limit(10));
-        const recentSnapshot = await getDocs(recentQuery);
-        let recentData: Blog[] = recentSnapshot.docs.map(doc => {
-          const data = doc.data() as DocumentData;
-          return {
-            id: doc.id,
-            title: data.title || "",
-            description: data.description || "",
-            imageUrl: data.imageUrl || "",
-            content: data.content || "",
-            date: data.date,
-            author: data.author || "",
-            tags: Array.isArray(data.tags) ? data.tags : [],
-            likes: Array.isArray(data.likes) ? data.likes : []
-          };
-        });
-        
-        // Filter out excluded IDs
-        if (excludeIds.length > 0) {
-          recentData = recentData.filter(blog => !excludeIds.includes(blog.id));
-        }
-        
-        return recentData.slice(0, count);
-      } catch (error) {
-        console.error("Error fetching recent blogs:", error);
-        return [];
       }
     };
 
