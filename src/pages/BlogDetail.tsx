@@ -1,8 +1,11 @@
 
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
-import { doc, getDoc } from "firebase/firestore";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
+import { Heart } from "lucide-react";
 
 interface Blog {
   id: string;
@@ -13,6 +16,7 @@ interface Blog {
   date: any;
   author: string;
   tags: string[];
+  likes?: string[];
 }
 
 const BlogDetail = () => {
@@ -20,6 +24,9 @@ const BlogDetail = () => {
   const [blog, setBlog] = useState<Blog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [liked, setLiked] = useState(false);
+  const { currentUser } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchBlog = async () => {
@@ -30,11 +37,19 @@ const BlogDetail = () => {
         const blogSnap = await getDoc(blogRef);
         
         if (blogSnap.exists()) {
-          setBlog({
+          const blogData = {
             id: blogSnap.id,
             ...blogSnap.data(),
-            tags: blogSnap.data().tags || []
-          } as Blog);
+            tags: blogSnap.data().tags || [],
+            likes: blogSnap.data().likes || []
+          } as Blog;
+          
+          setBlog(blogData);
+          
+          // Check if current user has liked this blog
+          if (currentUser && blogData.likes?.includes(currentUser.uid)) {
+            setLiked(true);
+          }
         } else {
           setError("Blog not found");
         }
@@ -47,7 +62,53 @@ const BlogDetail = () => {
     };
 
     fetchBlog();
-  }, [id]);
+  }, [id, currentUser]);
+
+  const handleLike = async () => {
+    if (!currentUser) {
+      toast.error("Please login to like this blog");
+      return;
+    }
+    
+    if (!blog || !id) return;
+    
+    try {
+      const blogRef = doc(db, "blogs", id);
+      
+      if (liked) {
+        // Unlike
+        await updateDoc(blogRef, {
+          likes: arrayRemove(currentUser.uid)
+        });
+        setLiked(false);
+        setBlog(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            likes: prev.likes?.filter(uid => uid !== currentUser.uid) || []
+          };
+        });
+        toast.success("Blog unliked");
+      } else {
+        // Like
+        await updateDoc(blogRef, {
+          likes: arrayUnion(currentUser.uid)
+        });
+        setLiked(true);
+        setBlog(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            likes: [...(prev.likes || []), currentUser.uid]
+          };
+        });
+        toast.success("Blog liked");
+      }
+    } catch (error) {
+      console.error("Error updating like:", error);
+      toast.error("Failed to update like status");
+    }
+  };
 
   const formatDate = (date: any) => {
     if (!date) return "No date";
@@ -69,29 +130,22 @@ const BlogDetail = () => {
     // Regular expression to find image markdown ![alt](url)
     const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
     
-    // Split the content by image markdown
-    const parts = content.split(imgRegex);
-    const matches = [...content.matchAll(imgRegex)];
-    
-    // If no images found, just return the content as is
-    if (matches.length === 0) {
-      return <p className="whitespace-pre-line">{content}</p>;
-    }
-    
-    // Build the rendered content with images
+    // Initialize result array and last processed index
     const result = [];
-    let textIndex = 0;
+    let lastIndex = 0;
+    let match;
+    let index = 0;
     
-    for (let i = 0; i < matches.length; i++) {
-      const match = matches[i];
-      const matchIndex = match.index as number;
+    // Iterate through all matches
+    while ((match = imgRegex.exec(content)) !== null) {
+      const matchIndex = match.index;
       
       // Add text before the image if there is any
-      if (matchIndex > textIndex) {
-        const textBeforeImage = content.substring(textIndex, matchIndex);
-        if (textBeforeImage) {
+      if (matchIndex > lastIndex) {
+        const textBeforeImage = content.substring(lastIndex, matchIndex);
+        if (textBeforeImage.trim()) {
           result.push(
-            <p key={`text-${i}`} className="whitespace-pre-line">
+            <p key={`text-${index}`} className="whitespace-pre-line">
               {textBeforeImage}
             </p>
           );
@@ -103,7 +157,7 @@ const BlogDetail = () => {
       const altText = match[1] || "Blog image";
       
       result.push(
-        <div key={`img-${i}`} className="my-6">
+        <div key={`img-${index}`} className="my-6">
           <img 
             src={imgUrl} 
             alt={altText}
@@ -112,14 +166,15 @@ const BlogDetail = () => {
         </div>
       );
       
-      // Update the text index to after this image markdown
-      textIndex = matchIndex + match[0].length;
+      // Update the last processed index to after the image markdown
+      lastIndex = matchIndex + match[0].length;
+      index++;
     }
     
     // Add any remaining text after the last image
-    if (textIndex < content.length) {
-      const textAfterImages = content.substring(textIndex);
-      if (textAfterImages) {
+    if (lastIndex < content.length) {
+      const textAfterImages = content.substring(lastIndex);
+      if (textAfterImages.trim()) {
         result.push(
           <p key="text-final" className="whitespace-pre-line">
             {textAfterImages}
@@ -177,10 +232,21 @@ const BlogDetail = () => {
             {blog?.title}
           </h1>
           
-          <div className="flex items-center text-muted-foreground mb-4">
-            <span>By {blog?.author}</span>
-            <span className="mx-2">•</span>
-            <span>{blog?.date ? formatDate(blog.date) : ""}</span>
+          <div className="flex items-center justify-between text-muted-foreground mb-4">
+            <div className="flex items-center">
+              <span>By {blog?.author}</span>
+              <span className="mx-2">•</span>
+              <span>{blog?.date ? formatDate(blog.date) : ""}</span>
+            </div>
+            
+            <button 
+              onClick={handleLike}
+              className="flex items-center gap-1 px-3 py-1 rounded-full bg-secondary/30 hover:bg-secondary transition-colors"
+              aria-label={liked ? "Unlike this blog" : "Like this blog"}
+            >
+              <Heart className={`h-5 w-5 ${liked ? "fill-red-500 text-red-500" : ""}`} />
+              <span>{blog.likes?.length || 0}</span>
+            </button>
           </div>
           
           {blog?.tags && blog.tags.length > 0 && (

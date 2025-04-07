@@ -60,7 +60,7 @@ const ContactPage = () => {
                 </div>
                 <div className="ml-4">
                   <h3 className="text-lg font-medium">Email</h3>
-                  <p className="text-muted-foreground">contact@animeodyssey.com</p>
+                  <p className="text-muted-foreground">ambrose.coder@gmail.com</p>
                 </div>
               </div>
               
@@ -72,7 +72,11 @@ const ContactPage = () => {
                 </div>
                 <div className="ml-4">
                   <h3 className="text-lg font-medium">Follow Us</h3>
-                  <p className="text-muted-foreground">@AnimeOdyssey on all platforms</p>
+                  <div className="text-muted-foreground">
+                    <a href="https://x.com/pyl1nx" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">X (@pyl1nx)</a>
+                    <span className="mx-2">•</span>
+                    <a href="https://t.me/anime_odyssey" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Telegram (@anime_odyssey)</a>
+                  </div>
                 </div>
               </div>
             </div>

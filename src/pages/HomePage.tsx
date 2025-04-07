@@ -28,7 +28,7 @@ const HomePage = () => {
       try {
         const blogsRef = collection(db, "blogs");
         
-        // Get featured blogs
+        // Get featured blogs - blogs that have 'featured' in their tags array
         const featuredQuery = query(
           blogsRef,
           where("tags", "array-contains", "featured"),
@@ -43,6 +43,8 @@ const HomePage = () => {
           tags: doc.data().tags || []
         })) as Blog[];
         
+        console.log("Featured blogs raw data:", featuredSnapshot.docs.map(doc => doc.data().tags));
+        
         // If no featured blogs, fallback to most recent blogs
         if (featuredData.length === 0) {
           const fallbackQuery = query(blogsRef, orderBy("date", "desc"), limit(3));
@@ -54,7 +56,7 @@ const HomePage = () => {
           })) as Blog[];
         }
         
-        // Get latest blogs
+        // Get latest blogs - blogs that have 'latest' in their tags array
         const latestQuery = query(
           blogsRef,
           where("tags", "array-contains", "latest"),
@@ -68,6 +70,8 @@ const HomePage = () => {
           ...doc.data(),
           tags: doc.data().tags || []
         })) as Blog[];
+        
+        console.log("Latest blogs raw data:", latestSnapshot.docs.map(doc => doc.data().tags));
         
         // Fallback to most recent that aren't in featured
         if (latestData.length < 4) {
@@ -88,8 +92,8 @@ const HomePage = () => {
           latestData = [...latestData, ...additionalRecent];
         }
         
-        console.log("Featured blogs:", featuredData);
-        console.log("Latest blogs:", latestData);
+        console.log("Final featured blogs:", featuredData);
+        console.log("Final latest blogs:", latestData);
         
         setFeaturedBlogs(featuredData);
         setRecentBlogs(latestData);
