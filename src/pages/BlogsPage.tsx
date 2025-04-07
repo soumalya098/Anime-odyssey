@@ -5,6 +5,7 @@ import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { Helmet } from "react-helmet-async";
 
 interface Blog {
   id: string;
@@ -30,11 +31,19 @@ const BlogsPage = () => {
         const blogsQuery = query(blogsRef, orderBy("date", "desc"));
         const snapshot = await getDocs(blogsQuery);
         
-        const blogsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          tags: doc.data().tags || []
-        })) as Blog[];
+        const blogsData = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            title: data.title || "",
+            description: data.description || "",
+            imageUrl: data.imageUrl || "",
+            content: data.content || "",
+            date: data.date,
+            author: data.author || "",
+            tags: Array.isArray(data.tags) ? data.tags : []
+          } as Blog;
+        });
         
         setBlogs(blogsData);
         setFilteredBlogs(blogsData);
@@ -77,8 +86,47 @@ const BlogsPage = () => {
     return "Invalid date";
   };
 
+  // Generate meta keywords from all blog tags
+  const getAllTags = () => {
+    const allTags = new Set<string>();
+    blogs.forEach(blog => {
+      blog.tags.forEach(tag => {
+        if (!["featured", "latest"].includes(tag)) {
+          allTags.add(tag);
+        }
+      });
+    });
+    return Array.from(allTags).join(", ");
+  };
+
   return (
     <div className="container py-16">
+      <Helmet>
+        <title>Anime Blogs | Anime Odyssey</title>
+        <meta name="description" content="Browse our complete collection of anime blog posts, reviews, and analysis." />
+        <meta name="keywords" content={`anime blogs, manga reviews, ${getAllTags()}`} />
+        <meta name="robots" content="index, follow" />
+        
+        <meta property="og:title" content="Anime Blogs | Anime Odyssey" />
+        <meta property="og:description" content="Browse our complete collection of anime blog posts, reviews, and analysis." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={window.location.href} />
+        
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            "name": "Anime Blogs | Anime Odyssey",
+            "description": "Browse our complete collection of anime blog posts, reviews, and analysis.",
+            "url": window.location.href,
+            "publisher": {
+              "@type": "Organization",
+              "name": "Anime Odyssey Hub"
+            }
+          })}
+        </script>
+      </Helmet>
+      
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-anime-pink via-anime-purple to-anime-blue">
           Our Anime Blog Collection

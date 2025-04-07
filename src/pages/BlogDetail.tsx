@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
@@ -5,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Heart } from "lucide-react";
+import { Helmet } from "react-helmet-async";
 
 interface Blog {
   id: string;
@@ -27,6 +29,7 @@ const BlogDetail = () => {
   const [likeCount, setLikeCount] = useState(0);
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const currentUrl = window.location.href;
 
   useEffect(() => {
     const fetchBlog = async () => {
@@ -37,11 +40,17 @@ const BlogDetail = () => {
         const blogSnap = await getDoc(blogRef);
         
         if (blogSnap.exists()) {
+          const data = blogSnap.data();
           const blogData = {
             id: blogSnap.id,
-            ...blogSnap.data(),
-            tags: blogSnap.data().tags || [],
-            likes: blogSnap.data().likes || []
+            title: data.title || "",
+            description: data.description || "",
+            imageUrl: data.imageUrl || "",
+            content: data.content || "",
+            date: data.date,
+            author: data.author || "",
+            tags: Array.isArray(data.tags) ? data.tags : [],
+            likes: Array.isArray(data.likes) ? data.likes : []
           } as Blog;
           
           setBlog(blogData);
@@ -132,6 +141,28 @@ const BlogDetail = () => {
     return "Invalid date";
   };
 
+  // Get publication date in ISO format for structured data
+  const getISODate = (date: any) => {
+    if (!date) return new Date().toISOString();
+    if (date.toDate) {
+      return date.toDate().toISOString();
+    }
+    return new Date().toISOString();
+  };
+
+  // Truncate description for meta tags if needed
+  const getTruncatedDescription = (text: string, maxLength = 160) => {
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength - 3) + '...';
+  };
+
+  // Get keywords from tags
+  const getKeywords = (tags: string[]) => {
+    // Filter out category tags
+    const contentTags = tags?.filter(tag => !['featured', 'latest'].includes(tag)) || [];
+    return [...contentTags, 'anime', 'manga', 'review'].join(', ');
+  };
+
   const renderContent = (content: string) => {
     if (!content) return null;
     
@@ -157,7 +188,7 @@ const BlogDetail = () => {
       }
       
       const imgUrl = match[2];
-      const altText = match[1] || "Blog image";
+      const altText = match[1] || blog?.title || "Anime blog image";
       
       result.push(
         <div key={`img-${index}`} className="my-6">
@@ -165,6 +196,7 @@ const BlogDetail = () => {
             src={imgUrl} 
             alt={altText}
             className="rounded-lg mx-auto max-h-[500px] object-contain"
+            loading="lazy"
           />
         </div>
       );
@@ -209,6 +241,57 @@ const BlogDetail = () => {
 
   return (
     <div className="container py-12">
+      <Helmet>
+        <title>{blog.title} | Anime Odyssey</title>
+        <meta name="description" content={getTruncatedDescription(blog.description)} />
+        <meta name="keywords" content={getKeywords(blog.tags)} />
+        <meta name="robots" content="index, follow" />
+        
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="article" />
+        <meta property="og:title" content={blog.title} />
+        <meta property="og:description" content={getTruncatedDescription(blog.description)} />
+        <meta property="og:image" content={blog.imageUrl} />
+        <meta property="og:url" content={currentUrl} />
+        <meta property="og:site_name" content="Anime Odyssey" />
+        
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={blog.title} />
+        <meta name="twitter:description" content={getTruncatedDescription(blog.description)} />
+        <meta name="twitter:image" content={blog.imageUrl} />
+        
+        {/* Structured Data / JSON-LD */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BlogPosting",
+            "headline": blog.title,
+            "description": blog.description,
+            "image": blog.imageUrl,
+            "datePublished": getISODate(blog.date),
+            "dateModified": getISODate(blog.date),
+            "author": {
+              "@type": "Organization",
+              "name": "Anime Odyssey Hub"
+            },
+            "publisher": {
+              "@type": "Organization",
+              "name": "Anime Odyssey Hub",
+              "logo": {
+                "@type": "ImageObject",
+                "url": `${window.location.origin}/placeholder.svg`
+              }
+            },
+            "mainEntityOfPage": {
+              "@type": "WebPage",
+              "@id": currentUrl
+            },
+            "keywords": blog.tags.join(", ")
+          })}
+        </script>
+      </Helmet>
+      
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <Link 
@@ -269,6 +352,7 @@ const BlogDetail = () => {
               src={blog?.imageUrl || "/placeholder.svg"} 
               alt={blog?.title}
               className="w-full h-full object-cover"
+              loading="lazy"
             />
           </div>
           

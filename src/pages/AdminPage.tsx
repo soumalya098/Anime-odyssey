@@ -22,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Helmet } from "react-helmet-async";
 
 interface Blog {
   id: string;
@@ -90,12 +91,20 @@ const AdminPage = () => {
     try {
       const blogsRef = collection(db, "blogs");
       const snapshot = await getDocs(blogsRef);
-      const blogsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        tags: doc.data().tags || [],
-        likes: doc.data().likes || []
-      })) as Blog[];
+      const blogsData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          title: data.title || "",
+          description: data.description || "",
+          imageUrl: data.imageUrl || "",
+          content: data.content || "",
+          date: data.date,
+          author: data.author || "",
+          tags: Array.isArray(data.tags) ? data.tags : [],
+          likes: Array.isArray(data.likes) ? data.likes : []
+        } as Blog;
+      });
       setBlogs(blogsData);
       setFilteredBlogs(blogsData);
     } catch (error) {
@@ -256,6 +265,11 @@ const AdminPage = () => {
 
   return (
     <div className="container py-12">
+      <Helmet>
+        <title>Admin Dashboard | Anime Odyssey</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
+      
       <h1 className="text-3xl font-bold mb-8 text-center text-transparent bg-clip-text bg-gradient-to-r from-anime-pink via-anime-purple to-anime-blue">
         Admin Dashboard
       </h1>

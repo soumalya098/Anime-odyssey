@@ -6,6 +6,7 @@ import { BlogCard } from "../components/BlogCard";
 import { Link } from "react-router-dom";
 import { collection, getDocs, query, orderBy, limit, where, DocumentData } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { Helmet } from "react-helmet-async";
 
 interface Blog {
   id: string;
@@ -38,14 +39,19 @@ const HomePage = () => {
         );
         
         const featuredSnapshot = await getDocs(featuredQuery);
-        const featuredData = featuredSnapshot.docs.map(doc => {
+        const featuredData: Blog[] = featuredSnapshot.docs.map(doc => {
           const data = doc.data() as DocumentData;
           return {
             id: doc.id,
-            ...data,
-            tags: data.tags || [],
-            likes: data.likes || []
-          } as Blog;
+            title: data.title || "",
+            description: data.description || "",
+            imageUrl: data.imageUrl || "",
+            content: data.content || "",
+            date: data.date,
+            author: data.author || "",
+            tags: Array.isArray(data.tags) ? data.tags : [],
+            likes: Array.isArray(data.likes) ? data.likes : []
+          };
         });
         
         console.log("Featured blogs fetched:", featuredData.length);
@@ -59,14 +65,19 @@ const HomePage = () => {
         );
         
         const latestSnapshot = await getDocs(latestQuery);
-        const latestData = latestSnapshot.docs.map(doc => {
+        const latestData: Blog[] = latestSnapshot.docs.map(doc => {
           const data = doc.data() as DocumentData;
           return {
             id: doc.id,
-            ...data,
-            tags: data.tags || [],
-            likes: data.likes || []
-          } as Blog;
+            title: data.title || "",
+            description: data.description || "",
+            imageUrl: data.imageUrl || "",
+            content: data.content || "",
+            date: data.date,
+            author: data.author || "",
+            tags: Array.isArray(data.tags) ? data.tags : [],
+            likes: Array.isArray(data.likes) ? data.likes : []
+          };
         });
         
         console.log("Latest blogs fetched:", latestData.length);
@@ -95,18 +106,23 @@ const HomePage = () => {
     };
 
     // Helper function to fetch recent blogs excluding certain IDs
-    const fetchRecentBlogs = async (blogsRef: any, count: number, excludeIds: string[]) => {
+    const fetchRecentBlogs = async (blogsRef: any, count: number, excludeIds: string[]): Promise<Blog[]> => {
       try {
         const recentQuery = query(blogsRef, orderBy("date", "desc"), limit(10));
         const recentSnapshot = await getDocs(recentQuery);
-        let recentData = recentSnapshot.docs.map(doc => {
+        let recentData: Blog[] = recentSnapshot.docs.map(doc => {
           const data = doc.data() as DocumentData;
           return {
             id: doc.id,
-            ...data,
-            tags: data.tags || [],
-            likes: data.likes || []
-          } as Blog;
+            title: data.title || "",
+            description: data.description || "",
+            imageUrl: data.imageUrl || "",
+            content: data.content || "",
+            date: data.date,
+            author: data.author || "",
+            tags: Array.isArray(data.tags) ? data.tags : [],
+            likes: Array.isArray(data.likes) ? data.likes : []
+          };
         });
         
         // Filter out excluded IDs
@@ -137,8 +153,45 @@ const HomePage = () => {
     return "Invalid date";
   };
 
+  // Generate meta keywords from all blog tags
+  const getAllTags = () => {
+    const allTags = new Set<string>();
+    [...featuredBlogs, ...recentBlogs].forEach(blog => {
+      blog.tags.forEach(tag => {
+        if (!["featured", "latest"].includes(tag)) {
+          allTags.add(tag);
+        }
+      });
+    });
+    return Array.from(allTags).join(", ");
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
+      <Helmet>
+        <title>Anime Odyssey - Dive Into The World of Anime</title>
+        <meta name="description" content="Explore our collection of anime reviews, analysis, and news. Discover featured posts and latest articles about your favorite anime series." />
+        <meta name="keywords" content={`anime, manga, japanese animation, anime blog, ${getAllTags()}`} />
+        <meta name="robots" content="index, follow" />
+        <meta property="og:title" content="Anime Odyssey - Dive Into The World of Anime" />
+        <meta property="og:description" content="Explore our collection of anime reviews, analysis, and news. Discover featured posts and latest articles about your favorite anime series." />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={window.location.href} />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            "name": "Anime Odyssey",
+            "url": window.location.origin,
+            "description": "A modern anime blog exploring the artistry, culture, and stories of Japanese animation.",
+            "publisher": {
+              "@type": "Organization",
+              "name": "Anime Odyssey Hub"
+            }
+          })}
+        </script>
+      </Helmet>
+      
       <HeroSection />
       
       <section className="container py-16">
