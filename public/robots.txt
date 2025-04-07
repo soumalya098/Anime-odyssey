@@ -4,7 +4,7 @@ User-agent: *
 Allow: /
 
 # Sitemaps
-Sitemap: https://yourdomain.com/sitemap.xml
+Sitemap: https://anime-odyssey-posts.vercel.app/sitemap.xml
 
 # Specific bot rules
 User-agent: Googlebot
