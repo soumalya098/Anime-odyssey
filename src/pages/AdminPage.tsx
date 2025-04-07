@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { collection, addDoc, serverTimestamp, getDocs, doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, getDocs, doc, updateDoc, getDoc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Navigate, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Edit, Image } from "lucide-react";
+import { Search, Edit, Trash, Image, AlertTriangle } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Blog {
   id: string;
@@ -22,6 +32,7 @@ interface Blog {
   date: any;
   author: string;
   tags: string[];
+  likes?: string[];
 }
 
 const AdminPage = () => {
@@ -44,6 +55,7 @@ const AdminPage = () => {
   const [currentTab, setCurrentTab] = useState("create");
   const [isFeatured, setIsFeatured] = useState(false);
   const [isLatest, setIsLatest] = useState(false);
+  const [blogToDelete, setBlogToDelete] = useState<string | null>(null);
 
   // Load blogs for management
   useEffect(() => {
@@ -81,7 +93,8 @@ const AdminPage = () => {
       const blogsData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        tags: doc.data().tags || []
+        tags: doc.data().tags || [],
+        likes: doc.data().likes || []
       })) as Blog[];
       setBlogs(blogsData);
       setFilteredBlogs(blogsData);
@@ -117,6 +130,20 @@ const AdminPage = () => {
     } catch (error) {
       console.error("Error loading blog:", error);
       toast.error("Failed to load blog for editing");
+    }
+  };
+
+  const handleDeleteBlog = async () => {
+    if (!blogToDelete) return;
+    
+    try {
+      await deleteDoc(doc(db, "blogs", blogToDelete));
+      toast.success("Blog deleted successfully!");
+      fetchBlogs(); // Refresh blog list
+      setBlogToDelete(null); // Close dialog
+    } catch (error) {
+      console.error("Error deleting blog:", error);
+      toast.error("Failed to delete blog");
     }
   };
 
@@ -191,7 +218,16 @@ const AdminPage = () => {
       if (isEditing && editId) {
         // Update existing blog
         const blogRef = doc(db, "blogs", editId);
-        await updateDoc(blogRef, blogData);
+        const blogSnap = await getDoc(blogRef);
+        if (blogSnap.exists()) {
+          const existingLikes = blogSnap.data().likes || [];
+          await updateDoc(blogRef, { 
+            ...blogData,
+            likes: existingLikes  // Preserve existing likes
+          });
+        } else {
+          await updateDoc(blogRef, blogData);
+        }
         toast.success("Blog updated successfully!");
       } else {
         // Create new blog
@@ -416,16 +452,26 @@ const AdminPage = () => {
                       ))}
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSearchParams({ edit: blog.id });
-                    }}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSearchParams({ edit: blog.id });
+                      }}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setBlogToDelete(blog.id)}
+                    >
+                      <Trash className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  </div>
                 </div>
               ))
             ) : (
@@ -436,6 +482,25 @@ const AdminPage = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!blogToDelete} onOpenChange={(open) => !open && setBlogToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this blog?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the blog and all its data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteBlog} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              <Trash className="h-4 w-4 mr-2" />
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

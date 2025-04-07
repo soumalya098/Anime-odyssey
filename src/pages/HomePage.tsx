@@ -50,7 +50,7 @@ const HomePage = () => {
         
         console.log("Featured blogs fetched:", featuredData.length);
         
-        // Get latest blogs - separate query for 'latest' tagged blogs
+        // Get latest blogs - using another query for 'latest' tagged blogs
         const latestQuery = query(
           blogsRef,
           where("tags", "array-contains", "latest"),
@@ -70,16 +70,20 @@ const HomePage = () => {
         });
         
         console.log("Latest blogs fetched:", latestData.length);
-        
-        // If no featured blogs, use most recent blogs
+
+        // If no featured blogs, use most recent blogs instead
         const finalFeatured = featuredData.length > 0 
           ? featuredData 
           : await fetchRecentBlogs(blogsRef, 3, []);
         
-        // If not enough latest blogs, fetch more recent ones
+        // If not enough latest blogs, fetch more recent ones excluding featured ones
         const finalLatest = latestData.length >= 4 
           ? latestData 
-          : await fetchRecentBlogs(blogsRef, 4, finalFeatured.map(blog => blog.id));
+          : await fetchRecentBlogs(
+              blogsRef, 
+              4, 
+              finalFeatured.map(blog => blog.id)
+            );
         
         setFeaturedBlogs(finalFeatured);
         setRecentBlogs(finalLatest);

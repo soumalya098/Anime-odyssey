@@ -83,6 +83,16 @@ const BlogDetail = () => {
         });
         setLiked(false);
         setLikeCount(prev => Math.max(0, prev - 1));
+        
+        // Update local blog state to keep likes in sync
+        setBlog(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            likes: (prev.likes || []).filter(uid => uid !== currentUser.uid)
+          };
+        });
+        
         toast.success("Blog unliked");
       } else {
         // Like
@@ -91,6 +101,16 @@ const BlogDetail = () => {
         });
         setLiked(true);
         setLikeCount(prev => prev + 1);
+        
+        // Update local blog state to keep likes in sync
+        setBlog(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            likes: [...(prev.likes || []), currentUser.uid]
+          };
+        });
+        
         toast.success("Blog liked");
       }
     } catch (error) {
