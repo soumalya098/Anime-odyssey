@@ -4,7 +4,7 @@ import { HeroSection } from "../components/HeroSection";
 import { FeaturedBlogCard } from "../components/FeaturedBlogCard";
 import { BlogCard } from "../components/BlogCard";
 import { Link } from "react-router-dom";
-import { collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, limit, where, DocumentData } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 interface Blog {
@@ -38,12 +38,15 @@ const HomePage = () => {
         );
         
         const featuredSnapshot = await getDocs(featuredQuery);
-        const featuredData = featuredSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          tags: doc.data().tags || [],
-          likes: doc.data().likes || []
-        })) as Blog[];
+        const featuredData = featuredSnapshot.docs.map(doc => {
+          const data = doc.data() as DocumentData;
+          return {
+            id: doc.id,
+            ...data,
+            tags: data.tags || [],
+            likes: data.likes || []
+          } as Blog;
+        });
         
         console.log("Featured blogs fetched:", featuredData.length);
         
@@ -56,12 +59,15 @@ const HomePage = () => {
         );
         
         const latestSnapshot = await getDocs(latestQuery);
-        const latestData = latestSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          tags: doc.data().tags || [],
-          likes: doc.data().likes || []
-        })) as Blog[];
+        const latestData = latestSnapshot.docs.map(doc => {
+          const data = doc.data() as DocumentData;
+          return {
+            id: doc.id,
+            ...data,
+            tags: data.tags || [],
+            likes: data.likes || []
+          } as Blog;
+        });
         
         console.log("Latest blogs fetched:", latestData.length);
         
@@ -89,13 +95,15 @@ const HomePage = () => {
       try {
         const recentQuery = query(blogsRef, orderBy("date", "desc"), limit(10));
         const recentSnapshot = await getDocs(recentQuery);
-        let recentData = recentSnapshot.docs
-          .map(doc => ({
+        let recentData = recentSnapshot.docs.map(doc => {
+          const data = doc.data() as DocumentData;
+          return {
             id: doc.id,
-            ...doc.data(),
-            tags: doc.data().tags || [],
-            likes: doc.data().likes || []
-          })) as Blog[];
+            ...data,
+            tags: data.tags || [],
+            likes: data.likes || []
+          } as Blog;
+        });
         
         // Filter out excluded IDs
         if (excludeIds.length > 0) {
