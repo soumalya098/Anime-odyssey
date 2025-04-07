@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
@@ -25,6 +24,7 @@ const BlogDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
@@ -45,6 +45,7 @@ const BlogDetail = () => {
           } as Blog;
           
           setBlog(blogData);
+          setLikeCount(blogData.likes?.length || 0);
           
           // Check if current user has liked this blog
           if (currentUser && blogData.likes?.includes(currentUser.uid)) {
@@ -81,13 +82,7 @@ const BlogDetail = () => {
           likes: arrayRemove(currentUser.uid)
         });
         setLiked(false);
-        setBlog(prev => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            likes: prev.likes?.filter(uid => uid !== currentUser.uid) || []
-          };
-        });
+        setLikeCount(prev => Math.max(0, prev - 1));
         toast.success("Blog unliked");
       } else {
         // Like
@@ -95,13 +90,7 @@ const BlogDetail = () => {
           likes: arrayUnion(currentUser.uid)
         });
         setLiked(true);
-        setBlog(prev => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            likes: [...(prev.likes || []), currentUser.uid]
-          };
-        });
+        setLikeCount(prev => prev + 1);
         toast.success("Blog liked");
       }
     } catch (error) {
@@ -123,24 +112,19 @@ const BlogDetail = () => {
     return "Invalid date";
   };
 
-  // Improved function to render content with embedded images
   const renderContent = (content: string) => {
     if (!content) return null;
     
-    // Regular expression to find image markdown ![alt](url)
     const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
     
-    // Initialize result array and last processed index
     const result = [];
     let lastIndex = 0;
     let match;
     let index = 0;
     
-    // Iterate through all matches
     while ((match = imgRegex.exec(content)) !== null) {
       const matchIndex = match.index;
       
-      // Add text before the image if there is any
       if (matchIndex > lastIndex) {
         const textBeforeImage = content.substring(lastIndex, matchIndex);
         if (textBeforeImage.trim()) {
@@ -152,7 +136,6 @@ const BlogDetail = () => {
         }
       }
       
-      // Add the image
       const imgUrl = match[2];
       const altText = match[1] || "Blog image";
       
@@ -166,12 +149,10 @@ const BlogDetail = () => {
         </div>
       );
       
-      // Update the last processed index to after the image markdown
       lastIndex = matchIndex + match[0].length;
       index++;
     }
     
-    // Add any remaining text after the last image
     if (lastIndex < content.length) {
       const textAfterImages = content.substring(lastIndex);
       if (textAfterImages.trim()) {
@@ -245,7 +226,7 @@ const BlogDetail = () => {
               aria-label={liked ? "Unlike this blog" : "Like this blog"}
             >
               <Heart className={`h-5 w-5 ${liked ? "fill-red-500 text-red-500" : ""}`} />
-              <span>{blog.likes?.length || 0}</span>
+              <span>{likeCount}</span>
             </button>
           </div>
           

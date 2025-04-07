@@ -16,6 +16,7 @@ interface Blog {
   date: any;
   author: string;
   tags: string[];
+  likes?: string[];
 }
 
 const HomePage = () => {
@@ -37,26 +38,16 @@ const HomePage = () => {
         );
         
         const featuredSnapshot = await getDocs(featuredQuery);
-        let featuredData = featuredSnapshot.docs.map(doc => ({
+        const featuredData = featuredSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
-          tags: doc.data().tags || []
+          tags: doc.data().tags || [],
+          likes: doc.data().likes || []
         })) as Blog[];
         
-        console.log("Featured blogs raw data:", featuredSnapshot.docs.map(doc => doc.data().tags));
+        console.log("Featured blogs fetched:", featuredData.length);
         
-        // If no featured blogs, fallback to most recent blogs
-        if (featuredData.length === 0) {
-          const fallbackQuery = query(blogsRef, orderBy("date", "desc"), limit(3));
-          const fallbackSnapshot = await getDocs(fallbackQuery);
-          featuredData = fallbackSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            tags: doc.data().tags || []
-          })) as Blog[];
-        }
-        
-        // Get latest blogs - blogs that have 'latest' in their tags array
+        // Get latest blogs - separate query for 'latest' tagged blogs
         const latestQuery = query(
           blogsRef,
           where("tags", "array-contains", "latest"),
@@ -65,42 +56,56 @@ const HomePage = () => {
         );
         
         const latestSnapshot = await getDocs(latestQuery);
-        let latestData = latestSnapshot.docs.map(doc => ({
+        const latestData = latestSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
-          tags: doc.data().tags || []
+          tags: doc.data().tags || [],
+          likes: doc.data().likes || []
         })) as Blog[];
         
-        console.log("Latest blogs raw data:", latestSnapshot.docs.map(doc => doc.data().tags));
+        console.log("Latest blogs fetched:", latestData.length);
         
-        // Fallback to most recent that aren't in featured
-        if (latestData.length < 4) {
-          const fallbackRecentQuery = query(blogsRef, orderBy("date", "desc"), limit(10));
-          const fallbackRecentSnapshot = await getDocs(fallbackRecentQuery);
-          const allRecentBlogs = fallbackRecentSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            tags: doc.data().tags || []
-          })) as Blog[];
-          
-          // Filter out blogs that are already in featured section
-          const featuredIds = featuredData.map(blog => blog.id);
-          const additionalRecent = allRecentBlogs
-            .filter(blog => !featuredIds.includes(blog.id) && !latestData.some(rb => rb.id === blog.id))
-            .slice(0, 4 - latestData.length);
-          
-          latestData = [...latestData, ...additionalRecent];
-        }
+        // If no featured blogs, use most recent blogs
+        const finalFeatured = featuredData.length > 0 
+          ? featuredData 
+          : await fetchRecentBlogs(blogsRef, 3, []);
         
-        console.log("Final featured blogs:", featuredData);
-        console.log("Final latest blogs:", latestData);
+        // If not enough latest blogs, fetch more recent ones
+        const finalLatest = latestData.length >= 4 
+          ? latestData 
+          : await fetchRecentBlogs(blogsRef, 4, finalFeatured.map(blog => blog.id));
         
-        setFeaturedBlogs(featuredData);
-        setRecentBlogs(latestData);
+        setFeaturedBlogs(finalFeatured);
+        setRecentBlogs(finalLatest);
       } catch (error) {
         console.error("Error fetching blogs:", error);
       } finally {
         setLoading(false);
+      }
+    };
+
+    // Helper function to fetch recent blogs excluding certain IDs
+    const fetchRecentBlogs = async (blogsRef: any, count: number, excludeIds: string[]) => {
+      try {
+        const recentQuery = query(blogsRef, orderBy("date", "desc"), limit(10));
+        const recentSnapshot = await getDocs(recentQuery);
+        let recentData = recentSnapshot.docs
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            tags: doc.data().tags || [],
+            likes: doc.data().likes || []
+          })) as Blog[];
+        
+        // Filter out excluded IDs
+        if (excludeIds.length > 0) {
+          recentData = recentData.filter(blog => !excludeIds.includes(blog.id));
+        }
+        
+        return recentData.slice(0, count);
+      } catch (error) {
+        console.error("Error fetching recent blogs:", error);
+        return [];
       }
     };
 
